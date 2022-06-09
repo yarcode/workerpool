@@ -62,7 +62,6 @@ func WithLogger(zl zerolog.Logger) PoolOption {
 
 // Start required num of workers.
 func (s *Pool) Start() {
-
 	s.logger.Debug().Int("worker_num", s.numWorkers).Msg("Starting workers")
 	s.stop = make(chan struct{})
 	s.jobs = make(chan Job)
@@ -104,6 +103,7 @@ func (s *Pool) Stop() {
 	s.logger.Debug().Msg("Done shutting down workers")
 }
 
+// Run job within the pool
 func (s *Pool) Run(job Job) {
 	s.jobs <- job
 }
