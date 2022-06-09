@@ -23,8 +23,25 @@ func Example() {
 	}
 
 	pool.Run(job)
-	pool.Stop()
-	// Output: hello
+}
+
+func Example_advancedUsage() {
+	pool := New()
+	pool.Start()
+
+	job := func(ctx context.Context) error {
+		//
+		// some tricky logic goes here
+		//
+
+		return nil
+	}
+	// add 3 seconds timeout for a job execution
+	job = AddTimeout(job, time.Second*3)
+	// retry job execution withing 5 attempts
+	job = AddRetry(job, strategy.Limit(5))
+
+	pool.Run(job)
 }
 
 func TestAddPanicRecovery(t *testing.T) {

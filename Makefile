@@ -18,3 +18,8 @@ cover:
 	@go clean -testcache
 	go test -cover -coverprofile=coverage.out -race -short ./... | grep -v 'no test files'
 	go tool cover -func=coverage.out
+
+readme:
+	goreadme --import-path=./ --badge-codecov --badge-godoc --badge-golangci \
+	--badge-goreportcard --credit=false \
+	github.com/yarcode/workerpool > README.md
