@@ -174,10 +174,12 @@ func ExampleAddLogger() {
 	pool.Start()
 
 	job1 := func(ctx context.Context) error {
+		time.Sleep(5 * time.Millisecond)
 		zerolog.Ctx(ctx).Warn().Msg("hello from job1")
 		return nil
 	}
 	job2 := func(ctx context.Context) error {
+		time.Sleep(10 * time.Millisecond)
 		zerolog.Ctx(ctx).Warn().Msg("hello from job2")
 		return nil
 	}
