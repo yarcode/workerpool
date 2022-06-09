@@ -20,6 +20,6 @@ cover:
 	go tool cover -func=coverage.out
 
 readme:
-	goreadme --import-path=./ --badge-codecov --badge-godoc --badge-golangci \
+	goreadme --badge-codecov --badge-godoc --badge-golangci \
 	--badge-goreportcard --credit=false \
 	github.com/yarcode/workerpool > README.md
