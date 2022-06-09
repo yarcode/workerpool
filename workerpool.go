@@ -7,11 +7,13 @@ package workerpool
 
 import (
 	"context"
+	"runtime"
+	"sync"
+	"time"
+
 	"github.com/rs/xid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"sync"
-	"time"
 )
 
 // Job is a function that receives context and being run asynchronously by the worker pool.
@@ -21,8 +23,9 @@ type Pool struct {
 	wg     *sync.WaitGroup
 	logger zerolog.Logger
 
-	jobs chan Job
-	stop chan struct{}
+	jobs       chan Job
+	stop       chan struct{}
+	numWorkers int
 
 	// DefaultContext is a context factory, generates default context for every job
 	DefaultContext func() context.Context
@@ -34,8 +37,9 @@ type PoolOption func(service *Pool)
 // New Pool constructor
 func New(opts ...PoolOption) *Pool {
 	s := &Pool{
-		wg:     &sync.WaitGroup{},
-		logger: log.Logger,
+		wg:         &sync.WaitGroup{},
+		logger:     log.Logger,
+		numWorkers: runtime.GOMAXPROCS(0) * 2,
 
 		DefaultContext: func() context.Context {
 			return context.Background()
@@ -56,17 +60,14 @@ func WithLogger(zl zerolog.Logger) PoolOption {
 	}
 }
 
-// Start starts required num of workers.
-//
-// Recommended value is
-// 		runtime.GOMAXPROCS(0) * 2
-func (s *Pool) Start(numWorkers int) {
+// Start required num of workers.
+func (s *Pool) Start() {
 
-	s.logger.Info().Int("worker_num", numWorkers).Msg("Starting workers")
+	s.logger.Debug().Int("worker_num", s.numWorkers).Msg("Starting workers")
 	s.stop = make(chan struct{})
 	s.jobs = make(chan Job)
-	s.wg.Add(numWorkers)
-	for i := 0; i < numWorkers; i++ {
+	s.wg.Add(s.numWorkers)
+	for i := 0; i < s.numWorkers; i++ {
 		go func(workerID int) {
 			defer s.wg.Done()
 			l := s.logger.With().Int("worker_id", workerID).Logger()
@@ -74,11 +75,7 @@ func (s *Pool) Start(numWorkers int) {
 				select {
 				case <-s.stop:
 					return
-				case job, ok := <-s.jobs:
-					if !ok {
-						// if jobs channel was closed
-						return
-					}
+				case job := <-s.jobs:
 					id := xid.New()
 					now := time.Now()
 					ll := l.With().Str("job_id", id.String()).Logger()
@@ -92,7 +89,7 @@ func (s *Pool) Start(numWorkers int) {
 		}(i)
 	}
 
-	s.logger.Info().Msg("Done starting workers")
+	s.logger.Debug().Msg("Done starting workers")
 }
 
 // Stop all active workers.
@@ -100,11 +97,11 @@ func (s *Pool) Start(numWorkers int) {
 //
 // This call is blocking and waits for all the jobs to complete.
 func (s *Pool) Stop() {
-	s.logger.Info().Msg("Shutting down workers")
+	s.logger.Debug().Msg("Shutting down workers")
 	close(s.stop)
 	s.wg.Wait()
 	close(s.jobs)
-	s.logger.Info().Msg("Done shutting down workers")
+	s.logger.Debug().Msg("Done shutting down workers")
 }
 
 func (s *Pool) Run(job Job) {

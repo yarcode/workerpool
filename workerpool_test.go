@@ -4,22 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Rican7/retry/strategy"
-	"github.com/rs/zerolog"
 	"os"
 	"testing"
 	"time"
-)
 
-func TestPool(t *testing.T) {
-	pool := New()
-	pool.Start(1)
-	pool.Stop()
-}
+	"github.com/Rican7/retry/strategy"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+)
 
 func Example() {
 	pool := New()
-	pool.Start(1)
+	pool.Start()
 
 	job := func(ctx context.Context) error {
 		fmt.Println("hello")
@@ -31,9 +27,18 @@ func Example() {
 	// Output: hello
 }
 
-func Example_panicHandling() {
+func TestAddPanicRecovery(t *testing.T) {
+	job := func(ctx context.Context) error {
+		panic("oops")
+	}
+	job = AddPanicRecovery(job)
+	err := job(context.Background())
+	assert.EqualError(t, err, "panic recovered: oops")
+}
+
+func ExampleAddPanicRecovery() {
 	pool := New()
-	pool.Start(1)
+	pool.Start()
 
 	job := func(ctx context.Context) error {
 		panic("oops")
@@ -46,7 +51,7 @@ func Example_panicHandling() {
 
 func ExampleAddRetry() {
 	pool := New()
-	pool.Start(1)
+	pool.Start()
 
 	retryCount := 0
 
@@ -67,7 +72,7 @@ func ExampleAddRetry() {
 
 func ExampleAddPostRun() {
 	pool := New()
-	pool.Start(1)
+	pool.Start()
 
 	job := func(ctx context.Context) error {
 		// example job will always fail
@@ -88,7 +93,7 @@ func ExampleAddPostRun() {
 
 func ExampleAddTimeout() {
 	pool := New()
-	pool.Start(1)
+	pool.Start()
 
 	job := func(ctx context.Context) error {
 		select {
@@ -117,7 +122,7 @@ func ExampleAddTimeout() {
 
 func ExampleAddContext() {
 	pool := New()
-	pool.Start(1)
+	pool.Start()
 
 	ctxKey := struct{}{}
 
@@ -138,10 +143,18 @@ func ExampleAddContext() {
 }
 
 func ExampleAddLogger() {
-	pool := New()
-	pool.Start(1)
+	// mock time for test purposes
+	zerolog.TimestampFunc = func() time.Time {
+		t, _ := time.Parse("2006-01-02", "2021-01-01")
+		return t
+	}
 
-	logger := zerolog.New(os.Stderr).Level(zerolog.WarnLevel).With().Timestamp().Logger()
+	l := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).With().Timestamp().Logger()
+	l1 := l.With().Str("logger", "logger1").Logger()
+	l2 := l.With().Str("logger", "logger2").Logger()
+
+	pool := New(WithLogger(l))
+	pool.Start()
 
 	job1 := func(ctx context.Context) error {
 		zerolog.Ctx(ctx).Warn().Msg("hello from job1")
@@ -151,15 +164,15 @@ func ExampleAddLogger() {
 		zerolog.Ctx(ctx).Warn().Msg("hello from job2")
 		return nil
 	}
-	// adding custom logger only to job1
-	job1 = AddLogger(job1, logger)
+	// adding custom jobs
+	job1 = AddLogger(job1, l1)
+	job2 = AddLogger(job2, l2)
 
 	pool.Run(job1)
-	// Will output with custom logger:
-	// {"level":"warn","time":"2022-03-10T13:19:42+07:00","message":"hello from job1"}
 	pool.Run(job2)
-	// Will output with default logger:
-	// {"level":"warn","worker_id":0,"job_id":"c8kpgvnefj8pmh7j67lg","time":"2022-03-10T13:19:42+07:00","message":"hello from job2"}
 
 	pool.Stop()
+
+	// Output: {"level":"warn","logger":"logger1","time":"2021-01-01T00:00:00Z","message":"hello from job1"}
+	// {"level":"warn","logger":"logger2","time":"2021-01-01T00:00:00Z","message":"hello from job2"}
 }
