@@ -1,0 +1,35 @@
+version: '3'
+
+tasks:
+  lint:
+    desc: Running linter checks
+    cmds:
+      - go tool golangci-lint run
+
+  test:
+    desc: Running UNIT tests
+    cmds:
+      - go clean -testcache
+      - go test -cover -race -short ./... | { grep -v 'no test files'; true; }
+
+  cover-html:
+    desc: Running test coverage with HTML output
+    cmds:
+      - go clean -testcache
+      - go test -cover -coverprofile=coverage.out -race -short ./... | grep -v 'no test files'
+      - go tool cover -html=coverage.out
+
+  cover:
+    desc: Running test coverage
+    cmds:
+      - go clean -testcache
+      - go test -cover -coverprofile=coverage.out -race -short ./... | grep -v 'no test files'
+      - go tool cover -func=coverage.out
+
+  readme:
+    desc: Generate README.md from Go doc
+    cmds:
+      - |
+        go tool goreadme --badge-codecov --badge-godoc --badge-golangci \
+        --badge-goreportcard --credit=false \
+        github.com/yarcode/workerpool > README.md
